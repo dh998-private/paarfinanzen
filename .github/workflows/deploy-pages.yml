@@ -55,6 +55,30 @@ jobs:
               path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
 
+      - name: Patch iPhone file import
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("extracted/paarfinanzen_flutter_pwa/lib/ui/settings_page.dart")
+          text = path.read_text(encoding="utf-8")
+          old = """      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['db', 'json', 'txt'],
+        withData: true,
+        allowMultiple: false,
+      );"""
+          new = """      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+        allowMultiple: false,
+      );"""
+          if old not in text and new not in text:
+              raise SystemExit("Expected FilePicker block not found")
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.5'
