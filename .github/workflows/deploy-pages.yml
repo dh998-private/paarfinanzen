@@ -25,7 +25,6 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path("project.zip")
           data = path.read_bytes()
           wrong = b"tashboard_page.dart"
@@ -62,21 +61,12 @@ jobs:
           from pathlib import Path
           path = Path("extracted/paarfinanzen_flutter_pwa/lib/ui/settings_page.dart")
           text = path.read_text(encoding="utf-8")
-          old = """      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['db', 'json', 'txt'],
-        withData: true,
-        allowMultiple: false,
-      );"""
-          new = """      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        withData: true,
-        allowMultiple: false,
-      );"""
-          if old not in text and new not in text:
-              raise SystemExit("Expected FilePicker block not found")
-          if old in text:
-              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          if "type: FileType.custom," in text:
+              text = text.replace("type: FileType.custom,", "type: FileType.any,", 1)
+          text = text.replace("        allowedExtensions: const ['db', 'json', 'txt'],\n", "", 1)
+          if "type: FileType.any," not in text:
+              raise SystemExit("FilePicker patch failed")
+          path.write_text(text, encoding="utf-8")
           PY
 
       - uses: subosito/flutter-action@v2
