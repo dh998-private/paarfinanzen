@@ -1,4 +1,4 @@
-name: Build and deploy PaarFinanzen PWA
+name: Build and publish PaarFinanzen PWA
 
 on:
   push:
@@ -6,16 +6,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +23,6 @@ jobs:
         run: |
           cat bundle/part*.b64 | base64 --decode > project.zip
 
-          # Im ursprünglichen Archiv steht nur im lokalen ZIP-Header
-          # "tashboard_page.dart", während das zentrale Verzeichnis bereits
-          # korrekt "dashboard_page.dart" enthält. Beide Namen sind gleich lang,
-          # daher kann der Header verlustfrei binär korrigiert werden.
           python3 - <<'PY'
           from pathlib import Path
 
@@ -79,19 +73,10 @@ jobs:
         working-directory: extracted/paarfinanzen_flutter_pwa
         run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: extracted/paarfinanzen_flutter_pwa/build/web
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./extracted/paarfinanzen_flutter_pwa/build/web
+          publish_branch: gh-pages
+          force_orphan: true
