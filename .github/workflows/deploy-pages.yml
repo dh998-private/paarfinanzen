@@ -19,31 +19,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Rebuild project archive
+        shell: bash
         run: |
           cat bundle/part*.b64 | base64 --decode > project.zip
           mkdir -p extracted
+
+          # Das ursprüngliche ZIP enthält bei dashboard_page.dart einen
+          # abweichenden lokalen Headernamen. Info-ZIP extrahiert die Datei
+          # korrekt unter dem Namen aus dem zentralen Verzeichnis, liefert
+          # für diese Warnung aber Exit-Code 1. Nur echte Fehler >1 abbrechen.
+          set +e
           unzip -q project.zip -d extracted
+          unzip_code=$?
+          set -e
+
+          if [ "$unzip_code" -gt 1 ]; then
+            echo "ZIP konnte nicht extrahiert werden (Exit-Code $unzip_code)."
+            exit "$unzip_code"
+          fi
+
+          test -f extracted/paarfinanzen_flutter_pwa/lib/ui/dashboard_page.dart
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.5'
           channel: stable
           cache: true
+
       - name: Dependencies
         working-directory: extracted/paarfinanzen_flutter_pwa
         run: flutter pub get
+
       - name: Tests
         working-directory: extracted/paarfinanzen_flutter_pwa
         run: flutter test
+
       - name: Build web
         working-directory: extracted/paarfinanzen_flutter_pwa
         run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: extracted/paarfinanzen_flutter_pwa/build/web
+
   deploy:
     environment:
       name: github-pages
