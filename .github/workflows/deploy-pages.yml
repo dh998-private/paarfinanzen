@@ -18,103 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rebuild project archive
+      - name: Rebuild clean Flutter project
         shell: bash
         run: |
-          cat bundle/part*.b64 | base64 --decode > project.zip
-
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("project.zip")
-          data = path.read_bytes()
-          wrong = b"tashboard_page.dart"
-          correct = b"dashboard_page.dart"
-          count = data.count(wrong)
-          if count != 1:
-              raise SystemExit(f"Erwartete genau einen falschen ZIP-Dateinamen, gefunden: {count}")
-          path.write_bytes(data.replace(wrong, correct))
-          PY
-
+          cat bundle-v2/part*.b64 | base64 --decode > project.tar.gz
           mkdir -p extracted
-          unzip -q project.zip -d extracted
+          tar -xzf project.tar.gz -C extracted
           test -f extracted/paarfinanzen_flutter_pwa/lib/ui/dashboard_page.dart
-
-      - name: Patch Flutter Category name conflict
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("extracted/paarfinanzen_flutter_pwa/lib/finance_store.dart")
-          text = path.read_text(encoding="utf-8")
-          old = "import 'package:flutter/foundation.dart';"
-          new = "import 'package:flutter/foundation.dart' hide Category;"
-          if old not in text and new not in text:
-              raise SystemExit("Expected Flutter foundation import not found")
-          if old in text:
-              path.write_text(text.replace(old, new, 1), encoding="utf-8")
-          PY
-
-      - name: Patch iPhone file import
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("extracted/paarfinanzen_flutter_pwa/lib/ui/settings_page.dart")
-          text = path.read_text(encoding="utf-8")
-          if "type: FileType.custom," in text:
-              text = text.replace("type: FileType.custom,", "type: FileType.any,", 1)
-          text = text.replace("        allowedExtensions: const ['db', 'json', 'txt'],\n", "", 1)
-          if "type: FileType.any," not in text:
-              raise SystemExit("FilePicker patch failed")
-          path.write_text(text, encoding="utf-8")
-          PY
-
-      - name: Put bookings first on iPhone
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("extracted/paarfinanzen_flutter_pwa/lib/ui/dashboard_page.dart")
-          text = path.read_text(encoding="utf-8")
-          marker = "Direkt bearbeiten"
-          if marker not in text:
-              booking_start = text.index("                    _IncomeSection(store: store),")
-              end_token = "                    const SizedBox(height: 28),"
-              booking_end = text.index(end_token, booking_start) + len(end_token)
-              booking_block = text[booking_start:booking_end]
-              text = text[:booking_start] + text[booking_end:]
-              summary_pos = text.index("                    _SummaryGrid(store: store),")
-              quick = (
-                  "                    Row(\n"
-                  "                      children: [\n"
-                  "                        Expanded(\n"
-                  "                          child: FilledButton.icon(\n"
-                  "                            onPressed: () => _showIncomeEditor(context, store),\n"
-                  "                            icon: const Icon(Icons.add_rounded),\n"
-                  "                            label: const Text('Einnahme hinzufügen'),\n"
-                  "                          ),\n"
-                  "                        ),\n"
-                  "                        const SizedBox(width: 8),\n"
-                  "                        Expanded(\n"
-                  "                          child: FilledButton.tonalIcon(\n"
-                  "                            onPressed: () => _showExpenseEditor(context, store),\n"
-                  "                            icon: const Icon(Icons.remove_rounded),\n"
-                  "                            label: const Text('Ausgabe hinzufügen'),\n"
-                  "                          ),\n"
-                  "                        ),\n"
-                  "                      ],\n"
-                  "                    ),\n"
-                  "                    const SizedBox(height: 8),\n"
-                  "                    const Text(\n"
-                  "                      'Direkt bearbeiten: Tippe auf eine Buchung.',\n"
-                  "                      style: TextStyle(color: AppColors.muted, fontSize: 12),\n"
-                  "                    ),\n"
-                  "                    const SizedBox(height: 12),\n"
-              )
-              insert = quick + booking_block + "\n                    const SizedBox(height: 16),\n"
-              text = text[:summary_pos] + insert + text[summary_pos:]
-              path.write_text(text, encoding="utf-8")
-          PY
+          test -f extracted/paarfinanzen_flutter_pwa/lib/ui/bookings_page.dart
 
       - uses: subosito/flutter-action@v2
         with:
