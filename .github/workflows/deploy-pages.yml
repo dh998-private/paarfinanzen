@@ -46,6 +46,21 @@ jobs:
           unzip -q project.zip -d extracted
           test -f extracted/paarfinanzen_flutter_pwa/lib/ui/dashboard_page.dart
 
+      - name: Patch Flutter Category name conflict
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("extracted/paarfinanzen_flutter_pwa/lib/finance_store.dart")
+          text = path.read_text(encoding="utf-8")
+          old = "import 'package:flutter/foundation.dart';"
+          new = "import 'package:flutter/foundation.dart' hide Category;"
+          if old not in text and new not in text:
+              raise SystemExit("Expected Flutter foundation import not found")
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.5'
